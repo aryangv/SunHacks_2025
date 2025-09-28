@@ -1,0 +1,212 @@
+'use client';
+
+import Link from "next/link";
+import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { generateResources } from "@/lib/api-client";
+import { processFile } from "@/lib/file-processor";
+import { TextInputModal } from "@/components/text-input-modal";
+import { Loader2 } from "lucide-react";
+
+export default function AccessResourcesPage() {
+  const [isTextModalOpen, setIsTextModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { text } = await processFile(file);
+      const response = await generateResources(text);
+      
+      if (response.error) {
+        setError(response.error);
+      } else if (response.data) {
+        // Save resources to localStorage and navigate to display page
+        localStorage.setItem('generatedResources', response.data.resources);
+        router.push('/resources-display');
+      }
+    } catch (err) {
+      setError('Failed to process file');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTextSubmit = async (text: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateResources(text);
+      
+      if (response.error) {
+        setError(response.error);
+      } else if (response.data) {
+        // Save resources to localStorage and navigate to display page
+        localStorage.setItem('generatedResources', response.data.resources);
+        router.push('/resources-display');
+      }
+    } catch (err) {
+      setError('Failed to generate resources');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = async () => {
+    if (!searchQuery.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateResources('', '', searchQuery.trim());
+      
+      if (response.error) {
+        setError(response.error);
+      } else if (response.data) {
+        // Save resources to localStorage and navigate to display page
+        localStorage.setItem('generatedResources', response.data.resources);
+        router.push('/resources-display');
+      }
+    } catch (err) {
+      setError('Failed to search resources');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files[0];
+    if (file) {
+      const input = fileInputRef.current;
+      if (input) {
+        input.files = event.dataTransfer.files;
+        handleFileUpload({ target: { files: [file] } } as any);
+      }
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+  };
+
+  return (
+    <div className="min-h-screen space-background text-white font-lastica">
+      <div className="min-h-screen grid grid-rows-[auto_1fr] gap-8 p-8">
+        <header className="text-center pt-16">
+          <Link href="/" className="inline-block mb-8 text-gray-300 hover:text-white transition-colors">
+            ← Back to Home
+          </Link>
+          <h1 className="text-5xl font-bold tracking-wider mb-4 text-white">Access Resources</h1>
+          <p className="text-xl text-gray-300 font-light tracking-wide">
+            Explore learning materials and educational content
+          </p>
+        </header>
+
+        <main className="max-w-4xl mx-auto w-full">
+          <div className="feature-card wave-pattern rounded-2xl p-12">
+            <div className="grid grid-rows-[auto_1fr_auto] gap-8 min-h-96">
+              <h2 className="text-3xl font-semibold text-white text-center">Learning Resources</h2>
+
+              <div className="space-y-6">
+                {/* Search Input */}
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search for specific topics or subjects..."
+                      className="flex-1 px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      onKeyPress={(e) => e.key === 'Enter' && handleSearchSubmit()}
+                    />
+                    <button
+                      onClick={handleSearchSubmit}
+                      disabled={!searchQuery.trim() || isLoading}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Search'
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* File Upload Area */}
+                <div className="place-self-center w-full max-w-md">
+                  <div 
+                    className="border-2 border-dashed border-gray-400 rounded-xl p-12 text-center hover:border-gray-300 transition-colors cursor-pointer"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-blue-600 opacity-30 mx-auto mb-4"></div>
+                    <p className="text-gray-300 text-lg mb-2">Browse available resources</p>
+                    <p className="text-gray-400 text-sm">or upload your own materials</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".txt,.md,.pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="text-red-400 text-center">
+                  {error}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button 
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="inline mr-2 h-4 w-4 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    'Browse Resources'
+                  )}
+                </button>
+                <button 
+                  className="border border-gray-400 hover:border-gray-300 text-gray-300 hover:text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                  onClick={() => setIsTextModalOpen(true)}
+                >
+                  Upload Materials
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <TextInputModal
+        isOpen={isTextModalOpen}
+        onClose={() => setIsTextModalOpen(false)}
+        onSubmit={handleTextSubmit}
+        title="Upload Materials"
+        placeholder="Paste your content here to find related educational resources..."
+        isLoading={isLoading}
+      />
+    </div>
+  )
+}
